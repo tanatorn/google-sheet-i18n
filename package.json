@@ -1,8 +1,8 @@
 {
-  "name": "i18n",
-  "version": "0.0.1",
+  "name": "google-sheet-i18n",
+  "version": "0.0.3",
   "description": "i18n using google sheets",
-  "main": "index.js",
+  "main": "lib/index.js",
   "scripts": {
     "dev": "babel src -w -d lib",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -24,6 +24,8 @@
   "dependencies": {
     "bluebird": "^3.3.4",
     "commander": "^2.9.0",
+    "fs-extra": "^0.26.7",
+    "google-spreadsheet": "^2.0.1",
     "lodash": "^4.6.1"
   },
   "bin": {

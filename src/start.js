@@ -4,13 +4,17 @@ import fse from 'fs-extra'
 import path from 'path'
 
 const { stdout } = process
-const creds = require('../credentials.json')
 const fs = Promise.promisifyAll(fse)
-const languagePath = `${process.cwd()}/lang`
+let config
 
-const categories = ['category', 'sub-category', 'subcategory2']
+try {
+  config = require(path.join(process.cwd(), 'i18n.config'))
+} catch (err) {
+  config = null
+}
 
-const languages = ['en_CA', 'fr_CA']
+const { sheetId, suffix, outPath, fileMapper, credentialsPath, categories, languages } = config
+
 
 const getInfo = (doc) => new Promise((resolve, reject) => {
   doc.getInfo((err, info) => {
@@ -23,7 +27,7 @@ const getInfo = (doc) => new Promise((resolve, reject) => {
 })
 
 const getRows = (worksheet) => new Promise((resolve, reject) => {
-  worksheet.getRows({ limit: 999999 }, (err, rows) => {
+  worksheet.getRows((err, rows) => {
     if (rows) {
       resolve(rows)
     } else {
@@ -32,21 +36,21 @@ const getRows = (worksheet) => new Promise((resolve, reject) => {
   })
 })
 
-const formatRow = (row, index) => {
+const formatRow = (row) => {
   const formattedRow = {}
 
-  if (!row.category || index === 0 || row.category === '#') {
+  if (!row.category || row.category === '#') {
     return null
   }
 
-  let rowIndex = `${row.category}.${row['sub-category']}.${row.subcategory2}`
+  let rowIndex = `${row.category}.${row[categories[1]]}.${row[categories[2]]}`
 
-  if (!row.subcategory2) {
-    rowIndex = `${row.category}.${row['sub-category']}`
+  if (!row[categories[2]]) {
+    rowIndex = `${row.category}.${row[categories[1]]}`
   }
 
-  if (!row['sub-category']) {
-    rowIndex = `${row.category}.${row.subcategory2}`
+  if (!row[categories[1]]) {
+    rowIndex = `${row.category}.${row[categories[2]]}`
   }
 
   formattedRow[rowIndex] = {}
@@ -61,27 +65,12 @@ const getTranslations = (worksheet) => {
   getRows(worksheet)
     .then(rows => {
       const formattedRows = rows.map(formatRow).filter(row => row !== null)
-      let output = '<?php '
       languages.forEach(language => {
-        fs.ensureDirAsync(`${languagePath}/${language}`)
+        fs.ensureDirAsync(`${outPath}/${language}`)
           .then(() => {
-            formattedRows.forEach((row, index) => {
-              if (index === 0) {
-                output += '$lang = ['
-              }
-
-              const key = Object.keys(row)[0]
-              const content = row[key][language].replace(/\"/g, '\\"').replace(/\'/g, "\\'")
-              output += `\'${key}\' => \'${content}\'`
-              if (index === formattedRows.length - 1) {
-                output += ']; ?>'
-              } else {
-                output += ','
-              }
-            })
-            fs.writeFileAsync(`${languagePath}/${language}/${worksheet.title.toLowerCase()}_lang.php`
-                , output, 'utf8')
-            output = '<?php '
+            const output = fileMapper(formattedRows, language)
+            fs.writeFileAsync(`${outPath}/${language}/${worksheet.title.toLowerCase() + suffix}`,
+              output, 'utf8')
           })
 
       })
@@ -89,22 +78,25 @@ const getTranslations = (worksheet) => {
 
 }
 
-const listSheets = ({ worksheets, title }) => {
+const generateTranslations = ({ worksheets, title }) => {
   stdout.write(`Generating language file for ${title} \n`)
   worksheets.forEach(getTranslations)
 }
 
 
 const start = () => {
+  if (config) {
+    const docSync = new GoogleSpreadsheet(sheetId)
+    const doc = Promise.promisifyAll(docSync)
 
-  const docSync = new GoogleSpreadsheet('1YhuBJhnJ15Geyclh5fFFRGJNI9RGzhcxnBrnl_zLA64')
-  const doc = Promise.promisifyAll(docSync)
+    const creds = require(credentialsPath)
 
-  fs.removeAsync(languagePath)
-    .then(() => fs.mkdirAsync(languagePath))
-    .then(() => doc.useServiceAccountAuthAsync(creds))
-    .then(() => getInfo(doc))
-    .then(listSheets)
+    fs.removeAsync(outPath)
+      .then(() => fs.mkdirAsync(outPath))
+      .then(() => doc.useServiceAccountAuthAsync(creds))
+      .then(() => getInfo(doc))
+      .then(generateTranslations)
+  }
 }
 
 

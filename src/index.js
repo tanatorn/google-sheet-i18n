@@ -3,9 +3,9 @@ import program from 'commander'
 import start from './start'
 
 program
-  .version('0.0.1')
+  .version('0.0.3')
   .usage('<command>')
-  .option('start', 'Create a proj')
+  .option('start', 'Run a translation')
   .parse(process.argv)
 
 
