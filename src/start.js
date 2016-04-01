@@ -13,7 +13,16 @@ try {
   config = null
 }
 
-const { sheetId, suffix, outPath, fileMapper, credentialsPath, categories, languages } = config
+const { sheetId,
+   suffix,
+   outPath,
+   credentialsPath,
+   categories,
+   languages,
+   preset } = config
+
+let { extension,
+  mapper } = config
 
 
 const getInfo = (doc) => new Promise((resolve, reject) => {
@@ -38,42 +47,51 @@ const getRows = (worksheet) => new Promise((resolve, reject) => {
 
 const formatRow = (row) => {
   const formattedRow = {}
+  let rowIndex = categories.reduce((previous, current, index, array) => {
+    if (row[array[0]] === null || row[array[0]] === '#') {
+      return null
+    }
 
-  if (!row.category || row.category === '#') {
-    return null
+    if (!row[current]) {
+      return previous
+    }
+
+    return `${previous}.${row[current]}`
+  }, '')
+
+  if (rowIndex !== null) {
+    rowIndex = rowIndex.substr(1)
+    formattedRow[rowIndex] = {}
+    languages.forEach((language) => {
+      formattedRow[rowIndex][language] = row[language.replace(/_/, '').toLowerCase()]
+    })
   }
 
-  let rowIndex = `${row.category}.${row[categories[1]]}.${row[categories[2]]}`
-
-  if (!row[categories[2]]) {
-    rowIndex = `${row.category}.${row[categories[1]]}`
-  }
-
-  if (!row[categories[1]]) {
-    rowIndex = `${row.category}.${row[categories[2]]}`
-  }
-
-  formattedRow[rowIndex] = {}
-  languages.forEach((language) => {
-    formattedRow[rowIndex][language] = row[language.replace(/_/, '').toLowerCase()]
-  })
-
-  return formattedRow
+  return rowIndex ? formattedRow : null
 }
 
 const getTranslations = (worksheet) => {
   getRows(worksheet)
     .then(rows => {
       const formattedRows = rows.map(formatRow).filter(row => row !== null)
-      languages.forEach(language => {
+      languages.forEach(language => (
         fs.ensureDirAsync(`${outPath}/${language}`)
           .then(() => {
-            const output = fileMapper(formattedRows, language)
-            fs.writeFileAsync(`${outPath}/${language}/${worksheet.title.toLowerCase() + suffix}`,
-              output, 'utf8')
+
+            if (preset) {
+              const { fileMapper, fileExtension } = require(path.join(__dirname, '../',
+               'lib/presets', preset))
+              extension = fileExtension
+              mapper = fileMapper
+            }
+            const output = mapper(formattedRows, language)
+            const writePath =
+              `${outPath}/${language}/${worksheet.title.toLowerCase() + (suffix || '') + extension}`
+
+            return fs.writeFileAsync(writePath, output, 'utf8')
           })
 
-      })
+      ))
     })
 
 }
@@ -92,7 +110,7 @@ const start = () => {
     const creds = require(credentialsPath)
 
     fs.removeAsync(outPath)
-      .then(() => fs.mkdirAsync(outPath))
+      .then(() => fs.ensureDirAsync(outPath))
       .then(() => doc.useServiceAccountAuthAsync(creds))
       .then(() => getInfo(doc))
       .then(generateTranslations)
