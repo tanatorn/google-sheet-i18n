@@ -1,6 +1,6 @@
 {
   "name": "google-sheet-i18n",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "i18n using google sheets",
   "main": "lib/index.js",
   "scripts": {
