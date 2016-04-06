@@ -1,6 +1,5 @@
 const escapeQuotes = (contents) => (
   contents
-    .replace(/\"/g, '\\"')
     .replace(/\'/g, "\\'")
 )
 
