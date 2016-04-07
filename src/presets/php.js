@@ -4,24 +4,33 @@ const escapeQuotes = (contents) => (
 )
 
 const fileMapper = (rows) => {
-  let output = '<?php \n' + `
-/**
- *  This file was generated using google-sheet-i18n with the PHP preset
- *  ¯\\_(ツ)_/¯
- */
-`
-  output += rows.reduce((outputSoFar, { key, data }, index) => {
-    if (index === 0) outputSoFar += '$lang = [ \n'
-    const content = escapeQuotes(data)
+  const outputObject = rows.reduce((outputSoFar, row) => {
+    const property = {}
+    property[row.key] = row.data
+    return Object.assign(outputSoFar, property)
+  }, {})
+
+  return Object.keys(outputObject).reduce((outputSoFar, key, index, keys) => {
+    const content = escapeQuotes(outputObject[key])
     let rowContent = `  \'${key}\' => \'${content}\'`
-    if (index === rows.length - 1) {
+
+    if (index === keys.length - 1) {
       rowContent += ']; \n ?>'
     } else {
       rowContent += ',\n'
     }
+
+    if (index === 0) {
+      return `${outputSoFar}$lang = [ \n${rowContent}`
+    }
+
     return outputSoFar + rowContent
-  }, '')
-  return output
+  }, '<?php \n' + `
+/**
+ *  This file was generated using google-sheet-i18n with the PHP preset
+ *  ¯\\_(ツ)_/¯
+ */
+`)
 }
 
 module.exports = {
