@@ -2,8 +2,11 @@ import GoogleSpreadsheet from 'google-spreadsheet'
 import Promise from 'bluebird'
 import fse from 'fs-extra'
 import path from 'path'
-
-const { stdout, cwd } = process
+import { getRows,
+  getInfo } from './sheets-helper'
+import { formatRow } from './formatter'
+const { stdout,
+  cwd } = process
 const fs = Promise.promisifyAll(fse)
 
 let config
@@ -22,61 +25,8 @@ const { sheetId,
   languages,
 } = config
 
+const delimiter = config.delimiter || '.'
 
-const getInfo = (doc) => new Promise((resolve, reject) => {
-  doc.getInfo((err, info) => {
-    if (info) {
-      resolve(info)
-    } else {
-      reject(err)
-    }
-  })
-})
-
-const getRows = (worksheet) => new Promise((resolve, reject) => {
-  worksheet.getRows((err, rows) => {
-    if (rows) {
-      resolve(rows)
-    } else {
-      reject(err)
-    }
-  })
-})
-
-/**
- *  Formats rows into key : { language: translation }
- *  ie. {
- *  	common.greeting: {
- *  		en_CA: 'Hello!',
- *  		fr_CA: 'Bonjour!'
- *  	}
- *  }
- */
-
-const formatRow = (row) => {
-  const formattedRow = {}
-  let rowIndex = categories.reduce((previous, current, index, array) => {
-    if (row[array[0]] === null || row[array[0]] === '#') {
-      return null
-    }
-
-    if (!row[current]) {
-      return previous
-    }
-
-    return `${previous}.${row[current]}`
-  }, '')
-
-  if (rowIndex !== null) {
-    rowIndex = rowIndex.substr(1)
-    formattedRow[rowIndex] = {}
-    languages.forEach((language) => {
-      formattedRow[rowIndex][language] = row[language.replace(/_/, '').toLowerCase()]
-    })
-  }
-
-  return rowIndex ? formattedRow : null
-}
 
 /**
  * Gets all the rows from the sheet, filters out undefined rows
@@ -85,7 +35,9 @@ const getSheetRows = (worksheet) => (
   new Promise((resolve, reject) => (
     getRows(worksheet)
       .then(rows => {
-        const newRows = rows.map(formatRow).filter(row => row !== null)
+        const newRows = rows
+          .map((row) => formatRow(row, categories, languages, delimiter))
+          .filter(row => row !== null)
         resolve({
           title: worksheet.title.toLowerCase(),
           rows: newRows,
@@ -195,7 +147,7 @@ const getSheets = ({ worksheets }) => {
   ))
 }
 
-const beingTranslations = (sheets) => (
+const beginTranslations = (sheets) => (
   Promise.all(outputs.map((output) => (
     new Promise((resolve, reject) => (
       fs.removeAsync(output.outPath)
@@ -218,7 +170,7 @@ const start = () => {
     doc.useServiceAccountAuthAsync(creds)
       .then(() => getInfo(doc))
       .then(getSheets)
-      .then(beingTranslations)
+      .then(beginTranslations)
       .then(() => stdout.write('Successfully generated i18n files! \n'))
 
   } else {

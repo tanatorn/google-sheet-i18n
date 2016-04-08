@@ -79,6 +79,9 @@ module.exports = {
 - `categories` - (required) Different columns used to create a translation key, ie.
 `onboarding.landing.intro` is created the [table](#table) above when generating i18n files
 
+- `delimiter` - (optional, default - '.') The delimiter used to join different categories to created
+a translation key
+
 - `credentialsPath` - (required) Absolute path to your crendentials JSON file
 
 - `languages`: (required) Specify the column on the sheets we want to use as the i18n values,
@@ -112,32 +115,19 @@ and returns a string to be written to the a file
 
 ### Example:
 ```js
-var escapeQuotes = function escapeQuotes(contents) {
-  return contents.replace(/\"/g, '\\"')
-}
 
-var fileMapper = function (rows, language) {
+var fileMapper = function fileMapper(rows, language) {
+
   var output = rows.reduce(function (outputSoFar, row, index, array) {
-    if (index === 0) {
-      outputSoFar = '{ \n'
-    }
+    outputSoFar[row.key] = row.data
+    return outputSoFar
+  }, {})
+  return '(function() {angular.module(\'translations\').constant(\'' + language + '\', ' + JSON.stringify(output) + ')\n})();\n'
 
-    var content = escapeQuotes(row.data)
-    var rowContent = ' "' + row.key + '": "' + content + '"'
-    if (index === array.length - 1) {
-      rowContent += '}'
-    } else {
-      rowContent += ',\n'
-    }
-
-    return outputSoFar + rowContent
-  }, '');
-  var template = '\n  (function() {\n    angular\n      .module(\'MyAngularModule\')\n      .constant(\'' + language + '\', ' + output + ')\n  })();\n  '
-  return template
 }
 
 var myAngularMapper = {
   fileMapper: fileMapper,
-  fileExtension: '.js'
+  fileExtension: '.js',
 }
 ```
