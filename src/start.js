@@ -1,26 +1,20 @@
-import GoogleSpreadsheet from 'google-spreadsheet'
 import Promise from 'bluebird'
 import fse from 'fs-extra'
 import path from 'path'
 import { getRows,
-  getInfo } from './sheets-helper'
+  getInfo,
+} from './sheets-helper'
 import { formatRow } from './formatter'
-const { stdout,
-  cwd } = process
+const { stdout } = process
 const fs = Promise.promisifyAll(fse)
+import { getConfig,
+  getDocument,
+  authorizeConnection,
+} from './config-helper'
 
-let config
+const config = getConfig()
 
-try {
-  config = require(path.join(cwd(), 'i18n.config'))
-} catch (err) {
-  config = null
-}
-
-
-const { sheetId,
-  outputs,
-  credentialsPath,
+const { outputs,
   categories,
   languages,
 } = config
@@ -165,9 +159,8 @@ const beginTranslations = (sheets) => (
 
 const start = () => {
   if (config) {
-    const doc = Promise.promisifyAll(new GoogleSpreadsheet(sheetId))
-    const creds = require(credentialsPath)
-    doc.useServiceAccountAuthAsync(creds)
+    const doc = getDocument(config)
+    authorizeConnection(config, doc)
       .then(() => getInfo(doc))
       .then(getSheets)
       .then(beginTranslations)
